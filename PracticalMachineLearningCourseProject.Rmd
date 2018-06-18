@@ -1,0 +1,36 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Richard A. Lent"
+output:
+  html_document:
+    theme: yeti
+editor_options: 
+  chunk_output_type: inline
+header-includes: \usepackage{caption} 
+---
+
+<!--
+The following two lines are LaTeX commands to prevent duplication of
+table and figure captions in PDF output. They require the 'header-includes: \usepackage{caption}' field in the YAML header.
+-->
+
+\captionsetup[table]{labelformat=empty}
+\captionsetup[figure]{labelformat=empty}
+
+```{r Global chunk options, include=FALSE}
+# These options apply to all subsequent R code chunks.
+knitr::opts_chunk$set(
+	echo = TRUE,
+	fig.align = "center",
+	message = FALSE,
+	warning = FALSE,
+	comment = NA
+)
+```
+
+**
+`r format(Sys.time(), '%e %B %Y')`
+**
+
+
+
