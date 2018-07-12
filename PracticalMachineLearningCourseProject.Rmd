@@ -3,10 +3,10 @@ title: "Prediction Assignment Writeup"
 author: "Richard A. Lent"
 header-includes: \usepackage{caption}
 output:
+  html_document:
+    self_contained: no
   html_notebook:
     theme: yeti
-  html_document:
-    df_print: paged
 editor_options:
   chunk_output_type: inline
 ---
@@ -82,7 +82,6 @@ Regardless, the idiot directions for this shitty project basically say that we c
 Should probably review the [shitty lecture on DFA](ModelBasedPrediction.pdf). 
 
 Or watch it [here](https://www.coursera.org/learn/practical-machine-learning/lecture/0KF0Q/model-based-prediction) until our eyes bleed.
-
 
 
 
