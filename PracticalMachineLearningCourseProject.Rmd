@@ -1,12 +1,14 @@
 ---
 title: "Prediction Assignment Writeup"
 author: "Richard A. Lent"
-output: 
+header-includes: \usepackage{caption}
+output:
   html_notebook:
     theme: yeti
-editor_options: 
+  html_document:
+    df_print: paged
+editor_options:
   chunk_output_type: inline
-header-includes: \usepackage{caption}
 ---
 
 <!--
