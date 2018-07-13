@@ -1,0 +1,88 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Richard A. Lent"
+header-includes: \usepackage{caption}
+output:
+  html_document:
+    self_contained: no
+  html_notebook:
+    theme: yeti
+editor_options:
+  chunk_output_type: inline
+---
+
+<!--
+The following two lines are LaTeX commands to prevent duplication of
+table and figure captions in PDF output. They require the 'header-includes: \usepackage{caption}' field in the YAML header.
+-->
+
+\captionsetup[table]{labelformat=empty}
+\captionsetup[figure]{labelformat=empty}
+
+```{r Global chunk options, include=FALSE}
+# These options apply to all subsequent R code chunks.
+knitr::opts_chunk$set(
+	echo = TRUE,
+	fig.align = "center",
+	message = FALSE,
+	warning = FALSE,
+	comment = NA
+)
+```
+
+**
+`r format(Sys.time(), '%e %B %Y')`
+**
+
+## Your mission
+
+> The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+```{r Data setup}
+library(readr)
+
+pml_training <- read_csv("pml-training.csv", guess_max = 19622)
+pml_testing <- read_csv("pml-testing.csv", guess_max = 20)
+```
+
+Function `read_csv` from `readr` (tidyverse) yields parsing errors but the plain 'ol `read.csv` does not.
+
+So look at the data frames produced by both functions and if they look more or less the same, we will not care.
+
+The data look pretty screwed up as it is. Lots of NAs and blanks. Actually, the data are massively fucked up, to use the scientific nomenclature.
+
+So turn the blanks into NAs, eliminate, ignore, or otherwise shun the NAs, and move on.
+
+Here are what the five classes of the response variable `classe` mean:
+
+> Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. 
+
+Whatever.
+
+The first column of training and test datasets is an integer ID, but the first variable name in the shitty headers is blank. Change that terd to "id" and see WTF.
+
+Helped with test set but not training. However, see [Warning message: In rbind(names(probs), probs_f) : number of columns of result](https://github.com/tidyverse/readr/issues/685).
+
+They say to add `guess_max = 2000` for whatever big number that makes you feel good. Something about idiot `readr` looking at the first 1000 rows of data to figure out variable types.
+
+And so using `guess_max = 19000` fixed it for the shitty training set. In that the error messages went away, but I fear that the shitty data are still with us. But we will force the lazy bastard to read ALL the records, to whit: 
+
+    pml_training <- read_csv("pml-training.csv", guess_max = 19622)
+  
+And same for the teeny, tiny test set:
+
+    pml_testing <- read_csv("pml-testing.csv", guess_max = 20)
+
+If we type `spec(pml_training)` we get the full shitty column specification and can then figure out which variables suck.
+
+We will have to look at all 160 shitty columns of data and see if the variable types chosen by shitty `readr` are acceptable. I fear they may be shitty.
+
+Regardless, the idiot directions for this shitty project basically say that we can do whatever TF we want with regard to selecting predictors, so fuck 'em.
+
+Should probably review the [shitty lecture on DFA](ModelBasedPrediction.pdf). 
+
+Or watch it [here](https://www.coursera.org/learn/practical-machine-learning/lecture/0KF0Q/model-based-prediction) until our eyes bleed.
+
+
+
+
