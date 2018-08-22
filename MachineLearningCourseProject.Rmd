@@ -37,7 +37,7 @@ knitr::opts_chunk$set(
 
 ## Data Wrangling and Exploratory Analysis
 
-This project uses data^[See [Human Activity Recognition](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har).] from accelerometers on the belt, forearm, arm, and dumbell of six participants, who were asked to perform barbell lifts correctly and incorrectly in five different ways. The goal is to predict the manner in which they did the exercise, using the dependent variable `classe` in the training dataset. 
+This project uses data^[See [Human Activity Recognition](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har).] from accelerometers worn on the belt, forearm, arm, and dumbell of six participants, who were asked to perform barbell lifts correctly and incorrectly in five different ways. The goal is to predict the manner in which participants did the exercise, using the dependent variable `classe` in the training dataset. The `classe` variable is a factor with five classes: A, exercise performed exactly according to the specification; B, throwing the elbows to the front; C, lifting the dumbbell only halfway; D, lowering the dumbbell only halfway; and E, throwing the hips to the front. Class A corresponds to the correct execution of the exercise, while the other four classes correspond to common mistakes.
 
 ```{r Data setup, message=FALSE, warning=FALSE, comment=FALSE}
 library(readr)
@@ -51,9 +51,18 @@ pml_training <- read_csv("pml-training.csv", guess_max = 19622)
 pml_testing <- read_csv("pml-testing.csv", guess_max = 20)
 ```
 
+```{r EDA}
+glimpse(pml_training, width = 90)               # A concise look at all the variables.
+sapply(pml_training, function(x) sum(is.na(x))) # Count the NAs in every column.
+sapply(pml_training, function(x) summary(x))    # Do a summary of every variable, including a count of NAs.
+pml_training_no_NA <- pml_training[, -which(colMeans(is.na(pml_training)) > 0.5)] # Delete NA variables.
+pml_training_no_NA <- select(pml_training_no_NA, "roll_belt":"classe")            # Delete irrelevant variables.
+pml_training_no_NA$classe <- as.factor(pml_training_no_NA$classe) # Convert character variable classe to a factor.
+# chart.Correlation(sb, method = "pearson", histogram = TRUE) # Slow, but pretty (and useful).
+# pairs(pml_training_no_NA, upper.panel = NULL) # Faster.
+```
 
-
-
+Of the 160 variables in the training set, there were many having high occurrence of NA values. The number of NA values was always 19216, close to the total number of observations in the training set (19622), suggestive of a device failure. 
 
 
 ## Model Building
@@ -62,7 +71,7 @@ pml_testing <- read_csv("pml-testing.csv", guess_max = 20)
 
 ## Out-of-Sample Error
 
-
+## Prediction
 
 > The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
 
@@ -113,18 +122,6 @@ More on assumptions of DFA, from [here](https://en.wikipedia.org/wiki/Linear_dis
 + Independence: Participants are assumed to be randomly sampled, and a participant’s score on one variable is assumed to be independent of scores on that variable for all other participants.[9][7]
 
 If it turns out that our damn covariance matrices are not equal, then we have to do quadratic discriminant analysis.
-
-```{r EDA}
-glimpse(pml_training) # Gives us a concise look at all the variables.
-sapply(pml_training, function(x) sum(is.na(x))) # Count the NAs in every column.
-sapply(pml_training, function(x) summary(x))    # Do a summary of every variable, including a count of NAs.
-sb <- pml_training[, 37:45] # How to carve out chunks of non-sucking variables.
-# dplyr::select() lets y'all use variables names as positions! And series of frikkin' positions!
-shitty <- select(sb, "accel_belt_y":"magnet_belt_x", "gyros_belt_x":"gyros_belt_z") 
-# chart.Correlation(sb, method = "pearson", histogram = TRUE) # Slow, but pretty (and useful).
-# pairs(sb, upper.panel = NULL) # Faster.
-```
-
 
 Need to look at all the NA variables to see how many NAs there are. Quick look (of one NA variable) suggests that these variables are almost all NAs. So we may be able to greatly reduce the number of variables by getting rid of most if not all of the NAs.
 
