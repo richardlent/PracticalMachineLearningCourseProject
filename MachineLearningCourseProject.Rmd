@@ -35,6 +35,10 @@ knitr::opts_chunk$set(
 `r format(Sys.time(), '%e %B %Y')`
 **
 
+READ [DILLON 1979](Dillon1979.pdf) !!
+
+AND [Comparison of Linear Discriminant Analysis and Logistic Regression for Data Classification](Discriminantanalysis1.pdf).
+
 ## Data Wrangling and Exploratory Analysis
 
 This project uses data^[See [Human Activity Recognition](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har).] from accelerometers worn on the belt, forearm, arm, and dumbell of six participants, who were asked to perform barbell lifts correctly and incorrectly in five different ways. The goal is to predict the manner in which participants did the exercise, using the dependent variable `classe` in the training dataset. The `classe` variable is a factor with five classes: A, exercise performed exactly according to the specification; B, throwing the elbows to the front; C, lifting the dumbbell only halfway; D, lowering the dumbbell only halfway; and E, throwing the hips to the front. Class A corresponds to the correct execution of the exercise, while the other four classes correspond to common mistakes.
@@ -43,6 +47,9 @@ This project uses data^[See [Human Activity Recognition](http://web.archive.org/
 library(readr)
 library(tidyverse)
 library(PerformanceAnalytics)
+library(nortest)
+library(Hmisc)
+options(max.print=1000000)
 
 # Un-comment the following two lines to download the raw data.
 # download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "pml-training.csv")
@@ -52,17 +59,24 @@ pml_testing <- read_csv("pml-testing.csv", guess_max = 20)
 ```
 
 ```{r EDA}
-glimpse(pml_training, width = 90)               # A concise look at all the variables.
-sapply(pml_training, function(x) sum(is.na(x))) # Count the NAs in every column.
-sapply(pml_training, function(x) summary(x))    # Do a summary of every variable, including a count of NAs.
+# glimpse(pml_training, width = 90)               # A concise look at all the variables.
+# sapply(pml_training, function(x) sum(is.na(x))) # Count the NAs in every column.
+# sapply(pml_training, function(x) summary(x))    # Do a summary of every variable, including a count of NAs.
 pml_training_no_NA <- pml_training[, -which(colMeans(is.na(pml_training)) > 0.5)] # Delete NA variables.
 pml_training_no_NA <- select(pml_training_no_NA, "roll_belt":"classe")            # Delete irrelevant variables.
 pml_training_no_NA$classe <- as.factor(pml_training_no_NA$classe) # Convert character variable classe to a factor.
+sapply(pml_training_no_NA, function(x) summary(x))
+sapply(pml_training_no_NA[, 1:52], function(x) {mean(x) - median(x)}) # Compute (mean - median), but not for classe.
+sapply(pml_training_no_NA[, 1:52], function(x) lillie.test(x)) # Normality tests. (The lillie.test works with large n.)
+rcorr(as.matrix(pml_training_no_NA[-53]))          # Pearson correlations and p-values.
+pca <- princomp(pml_training_no_NA[-53], cor=TRUE) # Principal components are uncorrelated.
+pcadf <- as.data.frame(pca$scores)
+sapply(pcadf, function(x) lillie.test(x)) # PCs are just as non-normal as the original data.
 # chart.Correlation(sb, method = "pearson", histogram = TRUE) # Slow, but pretty (and useful).
 # pairs(pml_training_no_NA, upper.panel = NULL) # Faster.
 ```
 
-Of the 160 variables in the training set, there were many having high occurrence of NA values. The number of NA values was always 19216, close to the total number of observations in the training set (19622), suggestive of a device failure. 
+Of the 160 variables in the training set, there were many with high occurrence of NA values. The number of NA values was always 19216, close to the total number of observations in the training set (19622), suggestive of a device failure. Those variables were eliminated from the analysis.
 
 
 ## Model Building
