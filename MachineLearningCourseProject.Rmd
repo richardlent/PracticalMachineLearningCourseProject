@@ -46,9 +46,10 @@ This project uses data^[See [Human Activity Recognition](http://web.archive.org/
 ```{r Data setup, message=FALSE, warning=FALSE, comment=FALSE}
 library(readr)
 library(tidyverse)
-library(PerformanceAnalytics)
 library(nortest)
 library(Hmisc)
+library(FNN)
+
 options(max.print=1000000)
 
 # Un-comment the following two lines to download the raw data.
@@ -58,22 +59,31 @@ pml_training <- read_csv("pml-training.csv", guess_max = 19622)
 pml_testing <- read_csv("pml-testing.csv", guess_max = 20)
 ```
 
-```{r EDA}
-# glimpse(pml_training, width = 90)               # A concise look at all the variables.
-# sapply(pml_training, function(x) sum(is.na(x))) # Count the NAs in every column.
-# sapply(pml_training, function(x) summary(x))    # Do a summary of every variable, including a count of NAs.
-pml_training_no_NA <- pml_training[, -which(colMeans(is.na(pml_training)) > 0.5)] # Delete NA variables.
-pml_training_no_NA <- select(pml_training_no_NA, "roll_belt":"classe")            # Delete irrelevant variables.
+```{r Data Wrangling and Exploratory Analysis}
+# (Code used in the exploratory phase is commented out here to save processing time.)
+
+# glimpse(pml_training, width = 90)                  # A concise look at all the variables.
+# sapply(pml_training, function(x) sum(is.na(x)))    # Count the NAs in every column.
+# sapply(pml_training, function(x) summary(x))       # Do a summary of every variable, including a count of NAs.
+# sapply(pml_training_no_NA, function(x) summary(x))
+# sapply(pml_training_no_NA[, 1:52], function(x) {mean(x) - median(x)}) # Compute (mean - median), but not for classe.
+# sapply(pml_training_no_NA[, 1:52], function(x) lillie.test(x)) # Normality tests. (The lillie.test works with large n.)
+# pairs(pml_training_no_NA, upper.panel = NULL)
+
+# Prepare data based on results of exploratory analyses.
+
+# Delete NA variables.
+pml_training_no_NA <- pml_training[, -which(colMeans(is.na(pml_training)) > 0.5)] 
+pml_testing_no_NA <- pml_testing[, -which(colMeans(is.na(pml_testing)) > 0.5)]
+
+# Delete irrelevant variables.
+pml_training_no_NA <- select(pml_training_no_NA, "roll_belt":"classe")            
+pml_testing_no_NA <- select(pml_testing_no_NA, "roll_belt":"magnet_forearm_z")
+
 pml_training_no_NA$classe <- as.factor(pml_training_no_NA$classe) # Convert character variable classe to a factor.
-sapply(pml_training_no_NA, function(x) summary(x))
-sapply(pml_training_no_NA[, 1:52], function(x) {mean(x) - median(x)}) # Compute (mean - median), but not for classe.
-sapply(pml_training_no_NA[, 1:52], function(x) lillie.test(x)) # Normality tests. (The lillie.test works with large n.)
-rcorr(as.matrix(pml_training_no_NA[-53]))          # Pearson correlations and p-values.
-pca <- princomp(pml_training_no_NA[-53], cor=TRUE) # Principal components are uncorrelated.
-pcadf <- as.data.frame(pca$scores)
-sapply(pcadf, function(x) lillie.test(x)) # PCs are just as non-normal as the original data.
-# chart.Correlation(sb, method = "pearson", histogram = TRUE) # Slow, but pretty (and useful).
-# pairs(pml_training_no_NA, upper.panel = NULL) # Faster.
+classe <- pml_training_no_NA$classe # Need classe in its own vector for FNN::knn.
+pml_training_no_NA_no_classe <- pml_training_no_NA[-53] # Get rid of classe for FNN::knn.
+
 ```
 
 Of the 160 variables in the training set, there were many with high occurrence of NA values. The number of NA values was always 19216, close to the total number of observations in the training set (19622), suggestive of a device failure. Those variables were eliminated from the analysis.
