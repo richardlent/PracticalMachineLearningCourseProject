@@ -33,6 +33,8 @@ This project uses data^[See [Human Activity Recognition](http://web.archive.org/
 
 ```{r Data setup, message=FALSE, warning=FALSE, comment=FALSE}
 
+# Data setup
+
 library(readr)
 library(tidyverse)
 library(nortest)
@@ -40,32 +42,31 @@ library(Hmisc)
 library(FNN)
 library(heplots)
 library(knitr)
+library(pander)
+library(kableExtra)
 
 options(max.print=1000000)
 options(scipen=999)
 
-# Un-comment the following two lines to download the raw data.
-# download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "pml-training.csv")
-# download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "pml-testing.csv")
+# Un-comment the following lines to download the raw data.
+# download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", 
+#               "pml-training.csv")
+# download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", 
+#               "pml-testing.csv")
 pml_training <- read_csv("pml-training.csv", guess_max = 19622)
 pml_testing <- read_csv("pml-testing.csv", guess_max = 20)
 
 ```
 
-```{r Data Wrangling and Exploratory Analysis}
+```{r Data Wrangling, Exploratory Analysis, and Model Building}
+
+# Data Wrangling, Exploratory Analysis, and Model Building
 
 # (Code used in the exploratory phase is commented out here to save processing time.)
 
-# glimpse(pml_training, width = 90)                  # A concise look at all the variables.
-# sapply(pml_training, function(x) sum(is.na(x)))    # Count the NAs in every column.
-# sapply(pml_training, function(x) summary(x))       # Do a summary of every variable, including a count of NAs.
-# sapply(pml_training_no_NA, function(x) summary(x))
-# sapply(pml_training_no_NA[, 1:52], function(x) {mean(x) - median(x)}) # Compute (mean - median), but not for classe.
-# sapply(pml_training_no_NA[, 1:52], function(x) lillie.test(x)) # Normality tests. (The lillie.test works with large n.)
-# pairs(pml_training_no_NA, upper.panel = NULL)      # Pairwise scatterplots of predictors.
-# rcorr(as.matrix(pml_training_no_NA[-53]))          # Correlation matrix and significance tests.
-
-# Prepare data based on results of exploratory analyses.
+# glimpse(pml_training, width = 90)               # A concise look at all the variables.
+# sapply(pml_training, function(x) sum(is.na(x))) # Count the NAs in every column.
+# sapply(pml_training, function(x) summary(x))    # Summarize each variable.
 
 # Delete NA variables.
 pml_training_no_NA <- pml_training[, -which(colMeans(is.na(pml_training)) > 0.5)] 
@@ -75,47 +76,83 @@ pml_testing_no_NA <- pml_testing[, -which(colMeans(is.na(pml_testing)) > 0.5)]
 pml_training_no_NA <- select(pml_training_no_NA, "roll_belt":"classe")            
 pml_testing_no_NA <- select(pml_testing_no_NA, "roll_belt":"magnet_forearm_z")
 
-pml_training_no_NA$classe <- as.factor(pml_training_no_NA$classe) # Convert character variable classe to a factor.
+# sapply(pml_training_no_NA, function(x) summary(x)) # Summarize each variable.
+# sapply(pml_training_no_NA[, 1:52], function(x) {mean(x) - median(x)}) # Compute (mean-median).
+# sapply(pml_training_no_NA[, 1:52], function(x) lillie.test(x)) # Normality tests. 
+# pairs(pml_training_no_NA, upper.panel = NULL)      # Pairwise scatterplots of predictors.
+# rcorr(as.matrix(pml_training_no_NA[-53]))          # Correlation matrix and significance tests.
+
+# Convert character variable classe to a factor.
+pml_training_no_NA$classe <- as.factor(pml_training_no_NA$classe) 
+
 classe <- pml_training_no_NA$classe # Need classe in its own vector for FNN::knn.
 pml_training_no_NA_no_classe <- pml_training_no_NA[-53] # Get rid of classe for FNN::knn.
-theBoxM <- boxM(pml_training_no_NA_no_classe, pml_training_no_NA$classe) # Test for homogeneity of covariance matrices.
+
+# Test for homogeneity of covariance matrices.
+theBoxM <- boxM(pml_training_no_NA_no_classe, pml_training_no_NA$classe) 
 
 ```
 
-Of the 160 variables in the training set, there were many with high occurrence of NA values. The number of NA values was always 19216, close to the total number of observations in the training set (19622), suggestive of a device failure. Those variables were eliminated from the analysis, in addition to several other variables deemed irrelevant to predicting exercise performance. 
+### Data Wrangling, Exploratory Analysis, and Model Building
 
-This left 52 quantitative predictor variables with no missing values. The Lilliefors test for normality (package [nortest](https://www.rdocumentation.org/packages/nortest/versions/1.0-4)) showed that all 52 predictors were significantly non-normal in distribution. In addition, Box's M-test (package [heplots](https://www.rdocumentation.org/packages/heplots/versions/1.3-5)) indicated extreme heterogeneity of predictor covariance matrices across levels of the dependent variable `classe` (`p < 0.00000000000000022`). Violation of these two assumptions eliminated both linear and quadratic discriminant analysis as choices for classification model building. Logistic regression was also eliminated due to the high degree of multicollinearity in the predictor variables, as indicated by matrices of predictor correlations and p-values (function [rcorr](https://www.rdocumentation.org/packages/Hmisc/versions/4.1-1/topics/rcorr)). 
+Of the 160 variables in the training set, there were many with high occurrence of NA values. The number of NA values was always 19216, close to the total number of observations in the training set (19622), possibly because of a device failure. Those variables were eliminated from the analysis, in addition to several other variables deemed irrelevant to predicting exercise performance. 
 
-Given the limitations of the data, we chose k-Nearest Neighbour (KNN) Classification (package [FNN](https://www.rdocumentation.org/packages/FNN/versions/1.1.2.1), function [knn](https://www.rdocumentation.org/packages/FNN/versions/1.1.2.1/topics/knn)) to build our predictive model. KNN is completely nonparametric and makes no assumptions about the distribution of the data. To predict a case from the test data, KNN finds the `k` training observations that are closest to the test case, using [Euclidean distances](https://en.wikipedia.org/wiki/Euclidean_distance) calculated from the predictor variables. The test case is then assigned to the class to which the majority of the `k` nearest neighbors belong.^[James, G., D. Witten, T. Hastie, and R. Tibshirani. 2013. An Introduction to Statistical Learning. Springer.]
+This left 52 quantitative predictor variables with no missing values. Predictor variables represented various aspects of movement of the body, arm, and barbell as measured by accelerometers worn by the participants. The Lilliefors test for normality (package [nortest](https://www.rdocumentation.org/packages/nortest/versions/1.0-4)), plus computing the difference between the mean and median, and viewing of pairwise scatterplots, showed that all 52 predictors were significantly non-normal in distribution. In addition, Box's M-test (package [heplots](https://www.rdocumentation.org/packages/heplots/versions/1.3-5)) indicated extreme heterogeneity of predictor covariance matrices across levels of the dependent variable `classe` (`p < 0.00000000000000022`). Violation of these two assumptions eliminated both linear and quadratic discriminant analysis as choices for classification model building. Logistic regression was also eliminated due to the high degree of multicollinearity in the predictor variables, as indicated by matrices of predictor correlations and p-values (function [rcorr](https://www.rdocumentation.org/packages/Hmisc/versions/4.1-1/topics/rcorr)). 
 
+Given the data limitations, we chose k-Nearest Neighbor Classification (KNN, package [FNN](https://www.rdocumentation.org/packages/FNN/versions/1.1.2.1), function [knn](https://www.rdocumentation.org/packages/FNN/versions/1.1.2.1/topics/knn)) to build our predictive engine. KNN is completely nonparametric and makes no assumptions about the distribution of the data, so that it is a "model-free" approach to classification.^[Hastie, T., R. Tibshirani, and J. Friedman. 2009. The Elements of Statistical Learning. Second edition. Springer-Verlag New York Inc.
+] To predict a case from the test data, KNN finds the `k` training observations that are closest to the test case, using a [Euclidean distance](https://en.wikipedia.org/wiki/Euclidean_distance) measure. The test case is then assigned to the class to which the majority of the `k` nearest neighbors belong. KNN is an appropriate choice for classification problems in which the data do not meet the assumptions of methods based on linear models. However, because KNN does not fit a model to the training data, it does not tell us which predictors have an important relationship to the dependent variable.^[James, G., D. Witten, T. Hastie, and R. Tibshirani. 2013. An Introduction to Statistical Learning. Springer-Verlag New York Inc.] This aspect of KNN was not considered to be critical as this project was focused on prediction, not interpretation.
 
-```{r k-nearest neighbors}
+```{r k-Nearest Neighbor Classification and Cross-Validation}
+
+# k-Nearest Neighbor Classification and Cross-Validation
 
 # Leave-one-out cross-validation of the training set.
 theKNN_CV <- knn.cv(pml_training_no_NA_no_classe, classe, k = 3, prob = TRUE)
-kable(table(classe, theKNN_CV), caption = "Table 1. Confusion matrix for k-Nearest Neighbor Classification, 
-      using leave-one-out cross-validation.", 
-      format = "pandoc")
 
-# Classification of the test set.
-theKNN <- FNN::knn(pml_training_no_NA_no_classe, pml_testing_no_NA, classe, k = 3, prob=TRUE)
-
-```
-
-```{r Prediction and Out-of-Sample Error}
-
-# Classification of the test set.
-theKNN <- FNN::knn(pml_training_no_NA_no_classe, pml_testing_no_NA, classe, k = 3, prob=TRUE)
+tab1 <- table(classe, theKNN_CV)
+tab1 %>%
+  kable("html", caption = "Table 1. Confusion matrix for the k-Nearest 
+  Neighbor Classification, using a leave-one-out cross-validation of the training data and
+  k = 3 nearest neighbors.") %>%   
+    kable_styling(bootstrap_options = "bordered", full_width = F, position="center")
 
 ```
 
-From Table 1 we can calculate the estimated out-of-sample error rate as `1 - ((5491+3565+3268+3065+3454)/19622) = 0.0397`, or approximately 4%.
+### k-Nearest Neighbor Classification and Cross-Validation
 
-> The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+Table 1 shows the confusion matrix for the k-Nearest Neighbor Classification, using a leave-one-out cross-validation of the training dataset using `k = 3` nearest neighbors. From Table 1 we can calculate the estimated out-of-sample error rate as:
 
-Linear discriminant analysis assumes that predictors are normally distributed and that the different classes have class-specific means and equal variance/covariance matrices.
+`1 - ((5491 + 3565 + 3268 + 3065 + 3454) / 19622) = 0.0397`, 
 
-If it turns out that our damn covariance matrices are not equal, then we have to do quadratic discriminant analysis. But QDA assumes that covariance matrices are equal, which they ain't.
+or approximately 4%.
+
+### Classification of the Test Data
+
+```{r Classification of the Test Data}
+
+# Classification of the Test Data
+
+theKNN <- FNN::knn(pml_training_no_NA_no_classe, pml_testing_no_NA, classe, k = 3, prob=TRUE)
+
+tab2 <- t(theKNN[1:length(theKNN)])
+tab2 %>%
+  kable("html", caption = "Table 2. Classification of test data using k-Nearest Neighbor 
+      Classification with k = 3 nearest neighbors.") %>%   
+    kable_styling(bootstrap_options = "bordered", full_width = T, position="center")
+
+```
+
+The same KNN algorithm was used to classify the test dataset, consisting of 20 different test cases. Table 2 shows the results of the classification. All test cases were classified correctly.
+
+
+
+
+
+
+
+
+
+
 
 
   
