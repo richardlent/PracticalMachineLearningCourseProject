@@ -3,14 +3,20 @@ title: "Predicting Exercise Performance Using Accelerometer Data"
 author: "Richard A. Lent"
 header-includes: \usepackage{caption}
 output:
-  html_notebook:
-    theme: yeti
   html_document:
     self_contained: no
+    theme: yeti
+  html_notebook:
     theme: yeti
 editor_options:
   chunk_output_type: inline
 ---
+
+```{r echo=FALSE}
+bytes <- file.size("MachineLearningCourseProject.Rmd")
+words <- bytes/10
+minutes <- words/200
+```
 
 ```{r Global chunk options, include=FALSE}
 
@@ -29,7 +35,9 @@ knitr::opts_chunk$set(
 `r format(Sys.time(), '%e %B %Y')`
 **
 
-This project uses data^[See [Human Activity Recognition](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har).] from accelerometers worn on the belt, forearm, arm, and barbell of six participants, who were asked to perform barbell lifts correctly and incorrectly in five different ways. The goal is to predict the manner in which participants did the exercise, using the dependent variable `classe` in the training dataset. The `classe` variable is a factor with five classes: A, exercise performed exactly according to the specification; B, throwing the elbows to the front; C, lifting the dumbbell only halfway; D, lowering the dumbbell only halfway; and E, throwing the hips to the front. Class A corresponds to the correct execution of the exercise, while the other four classes correspond to common mistakes.
+This project uses data^[See [Human Activity Recognition](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har).] from accelerometer devices worn on the belt, forearm, arm, and barbell of six participants, who were asked to perform barbell lifts correctly and incorrectly in five different ways. The goal is to predict the manner in which participants did the exercise, using the dependent variable `classe` in the training dataset. The `classe` variable is a factor with five classes: A, exercise performed exactly according to the specification; B, throwing the elbows to the front; C, lifting the dumbbell only halfway; D, lowering the dumbbell only halfway; and E, throwing the hips to the front. Class A corresponds to the correct execution of the exercise, while the other four classes correspond to common mistakes.
+
+In the following presentation, R code that produced the analysis is shown alongside explanatory text.
 
 ```{r Data setup, message=FALSE, warning=FALSE, comment=FALSE}
 
@@ -95,11 +103,11 @@ theBoxM <- boxM(pml_training_no_NA_no_classe, pml_training_no_NA$classe)
 
 ### Data Wrangling, Exploratory Analysis, and Model Building
 
-Of the 160 variables in the training set, there were many with high occurrence of NA values. The number of NA values was always 19216, close to the total number of observations in the training set (19622), possibly because of a device failure. Those variables were eliminated from the analysis, in addition to several other variables deemed irrelevant to predicting exercise performance. 
+Of the 160 variables in the training set, there were many with high occurrence of NA values (missing data). The number of NA values was always 19216, close to the total number of observations in the training set (19622), possibly because of a device failure. Those variables were eliminated from the analysis, in addition to several other variables deemed irrelevant to predicting exercise performance. 
 
 This left 52 quantitative predictor variables with no missing values. Predictor variables represented various aspects of movement of the body, arm, and barbell as measured by accelerometers worn by the participants. The Lilliefors test for normality (package [nortest](https://www.rdocumentation.org/packages/nortest/versions/1.0-4)), plus computing the difference between the mean and median, and viewing of pairwise scatterplots, showed that all 52 predictors were significantly non-normal in distribution. In addition, Box's M-test (package [heplots](https://www.rdocumentation.org/packages/heplots/versions/1.3-5)) indicated extreme heterogeneity of predictor covariance matrices across levels of the dependent variable `classe` (`p < 0.00000000000000022`). Violation of these two assumptions eliminated both linear and quadratic discriminant analysis as choices for classification model building. Logistic regression was also eliminated due to the high degree of multicollinearity in the predictor variables, as indicated by matrices of predictor correlations and p-values (function [rcorr](https://www.rdocumentation.org/packages/Hmisc/versions/4.1-1/topics/rcorr)). 
 
-Given the data limitations, we chose k-Nearest Neighbor Classification (KNN, package [FNN](https://www.rdocumentation.org/packages/FNN/versions/1.1.2.1), function [knn](https://www.rdocumentation.org/packages/FNN/versions/1.1.2.1/topics/knn)) to build our predictive engine. KNN is completely nonparametric and makes no assumptions about the distribution of the data, so that it is a "model-free" approach to classification.^[Hastie, T., R. Tibshirani, and J. Friedman. 2009. The Elements of Statistical Learning. Second edition. Springer-Verlag New York Inc.
+Given the data limitations, we chose k-Nearest Neighbor Classification (KNN, package [FNN](https://www.rdocumentation.org/packages/FNN/versions/1.1.2.1)) to build our predictive engine. KNN is completely nonparametric and makes no assumptions about the distribution of the data, so that it is a "model-free" approach to classification.^[Hastie, T., R. Tibshirani, and J. Friedman. 2009. The Elements of Statistical Learning. Second edition. Springer-Verlag New York Inc.
 ] To predict a case from the test data, KNN finds the `k` training observations that are closest to the test case, using a [Euclidean distance](https://en.wikipedia.org/wiki/Euclidean_distance) measure. The test case is then assigned to the class to which the majority of the `k` nearest neighbors belong. KNN is an appropriate choice for classification problems in which the data do not meet the assumptions of methods based on linear models. However, because KNN does not fit a model to the training data, it does not tell us which predictors have an important relationship to the dependent variable.^[James, G., D. Witten, T. Hastie, and R. Tibshirani. 2013. An Introduction to Statistical Learning. Springer-Verlag New York Inc.] This aspect of KNN was not considered to be critical as this project was focused on prediction, not interpretation.
 
 ```{r k-Nearest Neighbor Classification and Cross-Validation}
@@ -114,13 +122,16 @@ tab1 %>%
   kable("html", caption = "Table 1. Confusion matrix for the k-Nearest 
   Neighbor Classification, using a leave-one-out cross-validation of the training data and
   k = 3 nearest neighbors.") %>%   
-    kable_styling(bootstrap_options = "bordered", full_width = F, position="center")
+    kable_styling(bootstrap_options = "bordered", full_width = T, position="center") %>% 
+    footnote(general = "Exercise categories: A, exercise performed exactly according to the specification; B, throwing the elbows to the front; C, lifting the dumbbell only halfway; D, lowering the dumbbell only halfway; and E, throwing the hips to the front. Class A corresponds to the correct execution of the exercise, while the other four classes correspond to common mistakes.", general_title = "")
 
 ```
 
 ### k-Nearest Neighbor Classification and Cross-Validation
 
-Table 1 shows the confusion matrix for the k-Nearest Neighbor Classification, using a leave-one-out cross-validation of the training dataset using `k = 3` nearest neighbors. From Table 1 we can calculate the estimated out-of-sample error rate as:
+Table 1 shows the confusion matrix for the k-Nearest Neighbor Classification, using a leave-one-out cross-validation of the training dataset with `k = 3` nearest neighbors. Matrix elements on the diagonal show the number of cases that were correctly classified, while off-diagonal elements show misclassifications.
+
+From Table 1 we can calculate the estimated out-of-sample error rate as:
 
 `1 - ((5491 + 3565 + 3268 + 3065 + 3454) / 19622) = 0.0397`, 
 
@@ -136,8 +147,8 @@ theKNN <- FNN::knn(pml_training_no_NA_no_classe, pml_testing_no_NA, classe, k = 
 
 tab2 <- t(theKNN[1:length(theKNN)])
 tab2 %>%
-  kable("html", caption = "Table 2. Classification of test data using k-Nearest Neighbor 
-      Classification with k = 3 nearest neighbors.") %>%   
+  kable("html", caption = "Table 2. Classification of 20 test cases using k-Nearest Neighbor 
+      Classification with k = 3 nearest neighbors.", col.names = as.character(1:20)) %>%   
     kable_styling(bootstrap_options = "bordered", full_width = T, position="center")
 
 ```
