@@ -12,15 +12,8 @@ editor_options:
   chunk_output_type: inline
 ---
 
-<!--
-The following two lines are LaTeX commands to prevent duplication of
-table and figure captions in PDF output. They require the 'header-includes: \usepackage{caption}' field in the YAML header.
--->
-
-\captionsetup[table]{labelformat=empty}
-\captionsetup[figure]{labelformat=empty}
-
 ```{r Global chunk options, include=FALSE}
+
 # These options apply to all subsequent R code chunks.
 knitr::opts_chunk$set(
 	echo = TRUE,
@@ -29,37 +22,38 @@ knitr::opts_chunk$set(
 	warning = FALSE,
 	comment = NA
 )
+
 ```
 
 **
 `r format(Sys.time(), '%e %B %Y')`
 **
 
-READ [DILLON 1979](Dillon1979.pdf) !!
-
-AND [Comparison of Linear Discriminant Analysis and Logistic Regression for Data Classification](Discriminantanalysis1.pdf).
-
-## Data Wrangling and Exploratory Analysis
-
-This project uses data^[See [Human Activity Recognition](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har).] from accelerometers worn on the belt, forearm, arm, and dumbell of six participants, who were asked to perform barbell lifts correctly and incorrectly in five different ways. The goal is to predict the manner in which participants did the exercise, using the dependent variable `classe` in the training dataset. The `classe` variable is a factor with five classes: A, exercise performed exactly according to the specification; B, throwing the elbows to the front; C, lifting the dumbbell only halfway; D, lowering the dumbbell only halfway; and E, throwing the hips to the front. Class A corresponds to the correct execution of the exercise, while the other four classes correspond to common mistakes.
+This project uses data^[See [Human Activity Recognition](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har).] from accelerometers worn on the belt, forearm, arm, and barbell of six participants, who were asked to perform barbell lifts correctly and incorrectly in five different ways. The goal is to predict the manner in which participants did the exercise, using the dependent variable `classe` in the training dataset. The `classe` variable is a factor with five classes: A, exercise performed exactly according to the specification; B, throwing the elbows to the front; C, lifting the dumbbell only halfway; D, lowering the dumbbell only halfway; and E, throwing the hips to the front. Class A corresponds to the correct execution of the exercise, while the other four classes correspond to common mistakes.
 
 ```{r Data setup, message=FALSE, warning=FALSE, comment=FALSE}
+
 library(readr)
 library(tidyverse)
 library(nortest)
 library(Hmisc)
 library(FNN)
+library(heplots)
+library(knitr)
 
 options(max.print=1000000)
+options(scipen=999)
 
 # Un-comment the following two lines to download the raw data.
 # download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "pml-training.csv")
 # download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "pml-testing.csv")
 pml_training <- read_csv("pml-training.csv", guess_max = 19622)
 pml_testing <- read_csv("pml-testing.csv", guess_max = 20)
+
 ```
 
 ```{r Data Wrangling and Exploratory Analysis}
+
 # (Code used in the exploratory phase is commented out here to save processing time.)
 
 # glimpse(pml_training, width = 90)                  # A concise look at all the variables.
@@ -68,7 +62,8 @@ pml_testing <- read_csv("pml-testing.csv", guess_max = 20)
 # sapply(pml_training_no_NA, function(x) summary(x))
 # sapply(pml_training_no_NA[, 1:52], function(x) {mean(x) - median(x)}) # Compute (mean - median), but not for classe.
 # sapply(pml_training_no_NA[, 1:52], function(x) lillie.test(x)) # Normality tests. (The lillie.test works with large n.)
-# pairs(pml_training_no_NA, upper.panel = NULL)
+# pairs(pml_training_no_NA, upper.panel = NULL)      # Pairwise scatterplots of predictors.
+# rcorr(as.matrix(pml_training_no_NA[-53]))          # Correlation matrix and significance tests.
 
 # Prepare data based on results of exploratory analyses.
 
@@ -83,112 +78,47 @@ pml_testing_no_NA <- select(pml_testing_no_NA, "roll_belt":"magnet_forearm_z")
 pml_training_no_NA$classe <- as.factor(pml_training_no_NA$classe) # Convert character variable classe to a factor.
 classe <- pml_training_no_NA$classe # Need classe in its own vector for FNN::knn.
 pml_training_no_NA_no_classe <- pml_training_no_NA[-53] # Get rid of classe for FNN::knn.
+theBoxM <- boxM(pml_training_no_NA_no_classe, pml_training_no_NA$classe) # Test for homogeneity of covariance matrices.
 
 ```
 
-Of the 160 variables in the training set, there were many with high occurrence of NA values. The number of NA values was always 19216, close to the total number of observations in the training set (19622), suggestive of a device failure. Those variables were eliminated from the analysis.
+Of the 160 variables in the training set, there were many with high occurrence of NA values. The number of NA values was always 19216, close to the total number of observations in the training set (19622), suggestive of a device failure. Those variables were eliminated from the analysis, in addition to several other variables deemed irrelevant to predicting exercise performance. 
+
+This left 52 quantitative predictor variables with no missing values. The Lilliefors test for normality (package [nortest](https://www.rdocumentation.org/packages/nortest/versions/1.0-4)) showed that all 52 predictors were significantly non-normal in distribution. In addition, Box's M-test (package [heplots](https://www.rdocumentation.org/packages/heplots/versions/1.3-5)) indicated extreme heterogeneity of predictor covariance matrices across levels of the dependent variable `classe` (`p < 0.00000000000000022`). Violation of these two assumptions eliminated both linear and quadratic discriminant analysis as choices for classification model building. Logistic regression was also eliminated due to the high degree of multicollinearity in the predictor variables, as indicated by matrices of predictor correlations and p-values (function [rcorr](https://www.rdocumentation.org/packages/Hmisc/versions/4.1-1/topics/rcorr)). 
+
+Given the limitations of the data, we chose k-Nearest Neighbour (KNN) Classification (package [FNN](https://www.rdocumentation.org/packages/FNN/versions/1.1.2.1), function [knn](https://www.rdocumentation.org/packages/FNN/versions/1.1.2.1/topics/knn)) to build our predictive model. KNN is completely nonparametric and makes no assumptions about the distribution of the data. To predict a case from the test data, KNN finds the `k` training observations that are closest to the test case, using [Euclidean distances](https://en.wikipedia.org/wiki/Euclidean_distance) calculated from the predictor variables. The test case is then assigned to the class to which the majority of the `k` nearest neighbors belong.^[James, G., D. Witten, T. Hastie, and R. Tibshirani. 2013. An Introduction to Statistical Learning. Springer.]
 
 
-## Model Building
+```{r k-nearest neighbors}
 
-## Cross-Validation
+# Leave-one-out cross-validation of the training set.
+theKNN_CV <- knn.cv(pml_training_no_NA_no_classe, classe, k = 3, prob = TRUE)
+kable(table(classe, theKNN_CV), caption = "Table 1. Confusion matrix for k-Nearest Neighbor Classification, 
+      using leave-one-out cross-validation.", 
+      format = "pandoc")
 
-## Out-of-Sample Error
+# Classification of the test set.
+theKNN <- FNN::knn(pml_training_no_NA_no_classe, pml_testing_no_NA, classe, k = 3, prob=TRUE)
 
-## Prediction
+```
+
+```{r Prediction and Out-of-Sample Error}
+
+# Classification of the test set.
+theKNN <- FNN::knn(pml_training_no_NA_no_classe, pml_testing_no_NA, classe, k = 3, prob=TRUE)
+
+```
+
+From Table 1 we can calculate the estimated out-of-sample error rate as `1 - ((5491+3565+3268+3065+3454)/19622) = 0.0397`, or approximately 4%.
 
 > The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
 
-And, profoundly:
-
-> In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
-
-And so "belt, forearm, arm, and dumbell" are the keys to the shitty variables.
-
-All of the variables are numeric, the rest are NAs. So we ignore the NAs, uh course.
-
-We have the following for each of those four things:
-
-* Roll, pitch, yaw, as in: `roll_belt`, `pitch_belt`, `yaw_belt`.
-
-* Gyros, as in: `gyros_forearm_x`, `gyros_forearm_y`, `gyros_forearm_z`.
-
-* Acceleration, as in: `accel_forearm_x`, `y`, and `z`. 
-
-* Magnet, as in: `magnet_forearm_x`, `y`, and `z`.
-
-* There is also `total_accel_belt`, yada yada. So, total acceleration. Don't know WTF that means.
-
-There is also a variable called `problem_id`, which seems to be just an integer record number.
-
-So we have to read the shitty documentation and try to figure out WTF the variables mean, and how many of them we should use.
-
-Because we think that DFA is the way to go, because all of the variables are continuous. 
-
-So we need to yank out all of those into another data frame for analysis. Do some damn `dplyr` thing with the variable names, because it has some pretty, pretty subsetting functions. Put all the desired predictors in with the `classe` dependent variable and then yer just has to do a damn model statement with the dot thingy to use all predictors.
-
-Training set has well over 19k records, so we could do a damn PCA to reduce our shitty variable space 'n dimensionality 'n shit.
-
 Linear discriminant analysis assumes that predictors are normally distributed and that the different classes have class-specific means and equal variance/covariance matrices.
 
-Would use Box's M Test to determine whether two or more covariance matrices are equal.
+If it turns out that our damn covariance matrices are not equal, then we have to do quadratic discriminant analysis. But QDA assumes that covariance matrices are equal, which they ain't.
 
-The equal covariance matrix bullshit means that, for each of our five categories of the dependent variable, the predictor variables for those subsets of the data each have to have equal covariance matrices. Sort of the multivariate equivalent of the t-test or anova assumption that the samples in each block have to have equal variances.
 
-Need to do scatterplots of predictors vs response variable, to check for linearity.
-Need to do normality tests of predictors.
-
-More on assumptions of DFA, from [here](https://en.wikipedia.org/wiki/Linear_discriminant_analysis#Assumptions):
-
-+ Multivariate normality: Independent variables are normal for each level of the grouping variable.[9][7]
-+ Homogeneity of variance/covariance (homoscedasticity): Variances among group variables are the same across levels of predictors. Can be tested with Box's M statistic.[9][page needed] It has been suggested, however, that linear discriminant analysis be used when covariances are equal, and that quadratic discriminant analysis may be used when covariances are not equal.[7]
-+ Multicollinearity: Predictive power can decrease with an increased correlation between predictor variables.[7]
-+ Independence: Participants are assumed to be randomly sampled, and a participant’s score on one variable is assumed to be independent of scores on that variable for all other participants.[9][7]
-
-If it turns out that our damn covariance matrices are not equal, then we have to do quadratic discriminant analysis.
-
-Need to look at all the NA variables to see how many NAs there are. Quick look (of one NA variable) suggests that these variables are almost all NAs. So we may be able to greatly reduce the number of variables by getting rid of most if not all of the NAs.
-
-Actually, do a `glimpse` of the test set, because it only has 20 records and we can show the whole dataset by widening the window. I bleeve we can trash all of the NA variables. We will assume that the test dataset is a "representative sample" of the training set.
-
-Read the documentation and figure out WTF the variables are. Subset out the relevant predictors and then so some EDA to see who is linear, normal, yada.
-
-Here are what the five classes of the response variable `classe` mean:
-
-> Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. 
-
-Whatever.
-
-The first column of training and test datasets is an integer ID, but the first variable name in the shitty headers is blank. Change that terd to "id" and see WTF.
-
-Helped with test set but not training. However, see [Warning message: In rbind(names(probs), probs_f) : number of columns of result](https://github.com/tidyverse/readr/issues/685).
-
-They say to add `guess_max = 2000` for whatever big number that makes you feel good. Something about idiot `readr` looking at the first 1000 rows of data to figure out variable types.
-
-And so using `guess_max = 19000` fixed it for the shitty training set. In that the error messages went away, but I fear that the shitty data are still with us. But we will force the lazy bastard to read ALL the records, to whit: 
-
-    pml_training <- read_csv("pml-training.csv", guess_max = 19622)
   
-And same for the teeny, tiny test set:
-
-    pml_testing <- read_csv("pml-testing.csv", guess_max = 20)
-
-If we type `spec(pml_training)` we get the full shitty column specification and can then figure out which variables suck.
-
-We will have to look at all 160 shitty columns of data and see if the variable types chosen by shitty `readr` are acceptable. I fear they may be shitty.
-
-Regardless, the idiot directions for this shitty project basically say that we can do whatever TF we want with regard to selecting predictors, so fuck 'em.
-
-And thus mebbe we could do, if our variables permit us, an LDA with jackknifed cross-validation, and then we do the out-of-sample error with the test set, and also do the shitty quiz with the predictions of the test set.
-
-And thus again we regurgitate the shitness from yonder up above yonder 'n shit, inserting additional shit to 'splain the shitness of the shit:
-
-"You should create a report describing how you built your model [we have basically done that with all the shit that hath gone before], how you used cross validation [leave-one-out as one estimate of out-of-sample error], what you think the expected out of sample error is [leave-one-out bullshit plus true bullshit using the test set, and thus we have two damn out-of-sample bullshit error rates], and why you made the choices you did [because Gawd told me to]."
-
-Actually, we choose LDA because our variables are all quantitative, we have a multi-group thingy to classify, they are all normally distributed (please Gawd), and our covariance matrices are all equal [please, please again, deer Gawd].
-
-So, some of the variables are either massively skewed or bimodal. But others seem to be nicely symmetrical 'n normal 'n shit. So maybe we will do quick histograms of everybody and just use the ones that are pretty and nice. Because they say we can do whatever TF we want.
-
 
 
 
