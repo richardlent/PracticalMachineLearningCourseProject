@@ -4,7 +4,6 @@ author: "Richard A. Lent"
 header-includes: \usepackage{caption}
 output:
   html_document:
-    self_contained: no
     theme: yeti
   html_notebook:
     theme: yeti
