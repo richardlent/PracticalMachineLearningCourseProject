@@ -144,15 +144,15 @@ or approximately 4%.
 
 theKNN <- FNN::knn(pml_training_no_NA_no_classe, pml_testing_no_NA, classe, k = 3, prob=TRUE)
 
-tab2 <- t(theKNN[1:length(theKNN)])
-tab2 %>%
-  kable("html", caption = "Table 2. Classification of 20 test cases using k-Nearest Neighbor 
-      Classification with k = 3 nearest neighbors.", col.names = as.character(1:20)) %>%   
-    kable_styling(bootstrap_options = "bordered", full_width = T, position="center")
+# tab2 <- t(theKNN[1:length(theKNN)])
+# tab2 %>%
+#   kable("html", caption = "Table 2. Classification of 20 test cases using k-Nearest Neighbor 
+#       Classification with k = 3 nearest neighbors.", col.names = as.character(1:20)) %>%   
+#     kable_styling(bootstrap_options = "bordered", full_width = T, position="center")
 
 ```
 
-The same KNN algorithm was used to classify the test dataset, consisting of 20 different test cases. Table 2 shows the results of the classification. All test cases were classified correctly.
+The same KNN algorithm was used to classify the test dataset, consisting of 20 different test cases. All test cases were classified correctly.
 
 
 
